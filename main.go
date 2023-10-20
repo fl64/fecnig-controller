@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"go.uber.org/zap/zapcore"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -37,14 +38,14 @@ func (c *Config) Load() error {
 }
 
 type LocalFencingController struct {
-	logger             *zap.SugaredLogger
+	logger             *zap.Logger
 	config             Config
 	kubeClient         *kubernetes.Clientset
 	needToFeedWatchdog atomic.Bool
 	wg                 sync.WaitGroup
 }
 
-func NewWatchdogService(logger *zap.SugaredLogger, config Config) *LocalFencingController {
+func NewWatchdogService(logger *zap.Logger, config Config) *LocalFencingController {
 	return &LocalFencingController{
 		logger: logger,
 		config: config,
@@ -147,14 +148,14 @@ func (lfc *LocalFencingController) checkAPI(ctx context.Context) {
 				continue
 			}
 			lfc.needToFeedWatchdog.Store(true)
-			lfc.logger.Info("Node check - OK")
+			lfc.logger.Debug("Node check - OK")
 		case <-ctx.Done():
 			lfc.logger.Debug("Finishing the API check")
 			err := lfc.removeNodeLabel(ctx)
 			if err != nil {
 				lfc.logger.Error("Can't remove node label", zap.String("node", lfc.config.NodeName), zap.Error(err))
 			} else {
-				lfc.logger.Error("Remove node label", zap.String("node", lfc.config.NodeName))
+				lfc.logger.Info("Remove node label", zap.String("node", lfc.config.NodeName))
 			}
 
 			lfc.wg.Done()
@@ -182,17 +183,42 @@ func (lfc *LocalFencingController) Run(ctx context.Context) error {
 	return nil
 }
 
+func newLogger() *zap.Logger {
+	encoderConfig := zap.NewDevelopmentEncoderConfig()
+	encoderConfig.TimeKey = "timestamp"
+	encoderConfig.MessageKey = "msg"
+	encoderConfig.LevelKey = "level"
+	encoderConfig.CallerKey = "caller"
+	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	config := zap.Config{
+		Level:             zap.NewAtomicLevelAt(zap.DebugLevel),
+		Encoding:          "json",
+		Development:       false,
+		DisableCaller:     true,
+		DisableStacktrace: false,
+		Sampling:          nil,
+		EncoderConfig:     encoderConfig,
+		OutputPaths: []string{
+			"stdout",
+		},
+		ErrorOutputPaths: []string{
+			"stderr",
+		},
+		InitialFields: map[string]interface{}{
+			"pid": os.Getpid(),
+		},
+	}
+	return zap.Must(config.Build())
+}
+
 func main() {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	logger := zap.Must(zap.NewProduction())
-	if os.Getenv("APP_ENV") == "dev" {
-		logger = zap.Must(zap.NewDevelopment())
-	}
+	logger := newLogger()
 	defer logger.Sync()
-	sugar := logger.Sugar()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan,
@@ -215,7 +241,7 @@ func main() {
 
 	logger.Debug("Current config", zap.Reflect("config", config))
 
-	service := NewWatchdogService(sugar, config)
+	service := NewWatchdogService(logger, config)
 	err = service.Run(ctx)
 	if err != nil {
 		logger.Fatal("Can't run service", zap.Error(err))
