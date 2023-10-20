@@ -1,27 +1,20 @@
-package main
+package local_fencing_controller
 
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap/zapcore"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/fecning-controller/internal/common"
+	"github.com/ilyakaznacheev/cleanenv"
+	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"os"
-	"os/signal"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
-
-	"github.com/ilyakaznacheev/cleanenv"
-	_ "github.com/jpfuentes2/go-env/autoload"
-	"go.uber.org/zap"
-	"k8s.io/client-go/kubernetes"
 )
-
-const fecningNodeLabel = "deckhouse.io/fencing-enabled"
-const fecningNodeValue = "true"
 
 type Config struct {
 	WatchdogDevice            string        `env:"WATCHDOG_DEVICE" env-default:"/dev/watchdog"`
@@ -38,7 +31,7 @@ func (c *Config) Load() error {
 	return nil
 }
 
-type LocalFencingController struct {
+type localFencingController struct {
 	logger             *zap.Logger
 	config             Config
 	kubeClient         *kubernetes.Clientset
@@ -46,14 +39,14 @@ type LocalFencingController struct {
 	wg                 sync.WaitGroup
 }
 
-func NewWatchdogService(logger *zap.Logger, config Config) *LocalFencingController {
-	return &LocalFencingController{
+func NewWatchdogService(logger *zap.Logger, config Config) *localFencingController {
+	return &localFencingController{
 		logger: logger,
 		config: config,
 	}
 }
 
-func (lfc *LocalFencingController) getClientset() error {
+func (lfc *localFencingController) getClientset() error {
 	config, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
 	if err != nil {
 		config, err = rest.InClusterConfig()
@@ -69,26 +62,26 @@ func (lfc *LocalFencingController) getClientset() error {
 	return err
 }
 
-func (lfc *LocalFencingController) setNodeLabel(ctx context.Context) error {
-	node, err := lfc.kubeClient.CoreV1().Nodes().Get(ctx, lfc.config.NodeName, metav1.GetOptions{})
+func (lfc *localFencingController) setNodeLabel(ctx context.Context) error {
+	node, err := lfc.kubeClient.CoreV1().Nodes().Get(ctx, lfc.config.NodeName, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	node.Labels[fecningNodeLabel] = fecningNodeValue
-	_, err = lfc.kubeClient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	node.Labels[common.FecningNodeLabel] = common.FecningNodeValue
+	_, err = lfc.kubeClient.CoreV1().Nodes().Update(ctx, node, v1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (lfc *LocalFencingController) removeNodeLabel(ctx context.Context) error {
-	node, err := lfc.kubeClient.CoreV1().Nodes().Get(context.TODO(), lfc.config.NodeName, metav1.GetOptions{})
+func (lfc *localFencingController) removeNodeLabel(ctx context.Context) error {
+	node, err := lfc.kubeClient.CoreV1().Nodes().Get(context.TODO(), lfc.config.NodeName, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	delete(node.Labels, fecningNodeLabel)
-	_, err = lfc.kubeClient.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+	delete(node.Labels, common.FecningNodeLabel)
+	_, err = lfc.kubeClient.CoreV1().Nodes().Update(context.TODO(), node, v1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -96,7 +89,7 @@ func (lfc *LocalFencingController) removeNodeLabel(ctx context.Context) error {
 }
 
 // https://github.com/facebook/openbmc/blob/97eb23c53b45222e3b1711870f1ebdc504f7c926/tools/flashy/lib/utils/system.go#L497
-func (lfc *LocalFencingController) startWatchdogFeeding(ctx context.Context) {
+func (lfc *localFencingController) startWatchdogFeeding(ctx context.Context) {
 	watchdog, err := os.OpenFile(lfc.config.WatchdogDevice, os.O_WRONLY, 0)
 	if err != nil {
 		lfc.logger.Error("Unable to open watchdog device", zap.String("device", lfc.config.WatchdogDevice), zap.Error(err))
@@ -131,7 +124,7 @@ func (lfc *LocalFencingController) startWatchdogFeeding(ctx context.Context) {
 	}
 }
 
-func (lfc *LocalFencingController) checkAPI(ctx context.Context) {
+func (lfc *localFencingController) checkAPI(ctx context.Context) {
 	ticker := time.NewTicker(lfc.config.NodeCheckInterval)
 	err := lfc.setNodeLabel(ctx)
 	if err != nil {
@@ -143,7 +136,7 @@ func (lfc *LocalFencingController) checkAPI(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			_, err := lfc.kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			_, err := lfc.kubeClient.CoreV1().Nodes().List(ctx, v1.ListOptions{})
 			if err != nil {
 				lfc.logger.Error("Can't reach API", zap.Error(err))
 				lfc.needToFeedWatchdog.Store(false)
@@ -166,7 +159,7 @@ func (lfc *LocalFencingController) checkAPI(ctx context.Context) {
 	}
 }
 
-func (lfc *LocalFencingController) Run(ctx context.Context) error {
+func (lfc *localFencingController) Run(ctx context.Context) error {
 	var err error
 	err = lfc.getClientset()
 	if err != nil {
@@ -183,69 +176,4 @@ func (lfc *LocalFencingController) Run(ctx context.Context) error {
 
 	lfc.wg.Wait()
 	return nil
-}
-
-func newLogger() *zap.Logger {
-	encoderConfig := zap.NewDevelopmentEncoderConfig()
-	encoderConfig.TimeKey = "timestamp"
-	encoderConfig.MessageKey = "msg"
-	encoderConfig.LevelKey = "level"
-	encoderConfig.CallerKey = "caller"
-	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-
-	config := zap.Config{
-		Level:             zap.NewAtomicLevelAt(zap.DebugLevel),
-		Encoding:          "json",
-		Development:       false,
-		DisableCaller:     false,
-		DisableStacktrace: false,
-		Sampling:          nil,
-		EncoderConfig:     encoderConfig,
-		OutputPaths: []string{
-			"stdout",
-		},
-		ErrorOutputPaths: []string{
-			"stderr",
-		},
-		InitialFields: map[string]interface{}{
-			"pid": os.Getpid(),
-		},
-	}
-	return zap.Must(config.Build())
-}
-
-func main() {
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	logger := newLogger()
-	defer logger.Sync()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan,
-		syscall.SIGHUP,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
-	go func() {
-		s := <-sigChan
-		close(sigChan)
-		logger.Info("Catch signal", zap.String("signal", s.String()))
-		cancel()
-	}()
-
-	var config Config
-	err := config.Load()
-	if err != nil {
-		logger.Fatal("Can't read env vars", zap.Error(err))
-	}
-
-	logger.Debug("Current config", zap.Reflect("config", config))
-
-	service := NewWatchdogService(logger, config)
-	err = service.Run(ctx)
-	if err != nil {
-		logger.Fatal("Can't run service", zap.Error(err))
-	}
 }
