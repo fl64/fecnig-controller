@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/fecning-controller/internal/common"
-	"github.com/ilyakaznacheev/cleanenv"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -16,21 +15,6 @@ import (
 	"time"
 )
 
-type Config struct {
-	WatchdogDevice            string        `env:"WATCHDOG_DEVICE" env-default:"/dev/watchdog"`
-	WatchdogHeartbeatInterval time.Duration `env:"WATCHDOG_HEARTBEAT_INTERVAL" env-default:"5s"`
-	NodeCheckInterval         time.Duration `env:"NODE_CHECK_INTERVAL" env-default:"5s"`
-	NodeName                  string        `env:"NODE_NAME"`
-}
-
-func (c *Config) Load() error {
-	err := cleanenv.ReadEnv(c)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type localFencingController struct {
 	logger             *zap.Logger
 	config             Config
@@ -39,7 +23,7 @@ type localFencingController struct {
 	wg                 sync.WaitGroup
 }
 
-func NewWatchdogService(logger *zap.Logger, config Config) *localFencingController {
+func NewLocalFencingController(logger *zap.Logger, config Config) *localFencingController {
 	return &localFencingController{
 		logger: logger,
 		config: config,

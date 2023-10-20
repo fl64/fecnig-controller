@@ -40,7 +40,7 @@ func main() {
 
 	logger.Debug("Current config", zap.Reflect("config", config))
 
-	service := local_fencing_controller.NewWatchdogService(logger, config)
+	service := local_fencing_controller.NewLocalFencingController(logger, config)
 	err = service.Run(ctx)
 	if err != nil {
 		logger.Fatal("Can't run service", zap.Error(err))
