@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"go.uber.org/zap/zapcore"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -24,7 +25,7 @@ const fecningNodeValue = "true"
 
 type Config struct {
 	WatchdogDevice            string        `env:"WATCHDOG_DEVICE" env-default:"/dev/watchdog"`
-	WatchdogHeartbeatInterval time.Duration `env:"WATCHDOG_HEARTBEAT_INTERVAL" env-default:"10s"`
+	WatchdogHeartbeatInterval time.Duration `env:"WATCHDOG_HEARTBEAT_INTERVAL" env-default:"5s"`
 	NodeCheckInterval         time.Duration `env:"NODE_CHECK_INTERVAL" env-default:"5s"`
 	NodeName                  string        `env:"NODE_NAME"`
 }
@@ -94,20 +95,21 @@ func (lfc *LocalFencingController) removeNodeLabel(ctx context.Context) error {
 	return nil
 }
 
-func (lfc *LocalFencingController) feedWatchdog(ctx context.Context) {
+// https://github.com/facebook/openbmc/blob/97eb23c53b45222e3b1711870f1ebdc504f7c926/tools/flashy/lib/utils/system.go#L497
+func (lfc *LocalFencingController) startWatchdogFeeding(ctx context.Context) {
 	watchdog, err := os.OpenFile(lfc.config.WatchdogDevice, os.O_WRONLY, 0)
 	if err != nil {
-		lfc.logger.Error("Can't open file", zap.Error(err))
+		lfc.logger.Error("Unable to open watchdog device", zap.String("device", lfc.config.WatchdogDevice), zap.Error(err))
 		return
 	}
-	defer func() {
-		_ = watchdog.Close()
-	}()
-	sendHeartbeat := func(s string) {
-		_, err := watchdog.WriteString(s)
+	defer watchdog.Close()
+
+	feedWatchdog := func(s string) {
+		_, err := fmt.Fprint(watchdog, s)
 		if err != nil {
 			lfc.logger.Error("Failed to write to watchdog device", zap.String("device", lfc.config.WatchdogDevice))
 		}
+		watchdog.Sync()
 	}
 	ticker := time.NewTicker(lfc.config.WatchdogHeartbeatInterval)
 	defer ticker.Stop()
@@ -116,13 +118,13 @@ func (lfc *LocalFencingController) feedWatchdog(ctx context.Context) {
 		case <-ticker.C:
 			if lfc.needToFeedWatchdog.Load() {
 				lfc.logger.Debug("Feeding watchdog")
-				sendHeartbeat("1")
+				feedWatchdog("1")
 			} else {
 				lfc.logger.Debug("Skip feeding watchdog")
 			}
 		case <-ctx.Done():
 			lfc.logger.Info("Graceful termination of watchdog operation")
-			sendHeartbeat("V")
+			feedWatchdog("V")
 			lfc.wg.Done()
 			return
 		}
@@ -173,7 +175,7 @@ func (lfc *LocalFencingController) Run(ctx context.Context) error {
 
 	lfc.logger.Info("Start feeding watchdog")
 	lfc.wg.Add(1)
-	go lfc.feedWatchdog(ctx)
+	go lfc.startWatchdogFeeding(ctx)
 
 	lfc.logger.Info("Start API check")
 	lfc.wg.Add(1)
@@ -195,7 +197,7 @@ func newLogger() *zap.Logger {
 		Level:             zap.NewAtomicLevelAt(zap.DebugLevel),
 		Encoding:          "json",
 		Development:       false,
-		DisableCaller:     true,
+		DisableCaller:     false,
 		DisableStacktrace: false,
 		Sampling:          nil,
 		EncoderConfig:     encoderConfig,
