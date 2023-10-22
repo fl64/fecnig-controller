@@ -40,9 +40,11 @@ func main() {
 
 	logger.Debug("Current config", zap.Reflect("config", config))
 
-	service := local_fencing_controller.NewLocalFencingController(logger, config)
-	err = service.Run(ctx)
+	kubeClient, err := common.GetClientset()
 	if err != nil {
-		logger.Fatal("Can't run service", zap.Error(err))
+		logger.Fatal("Can't create kubernetes clientSet", zap.Error(err))
 	}
+
+	service := local_fencing_controller.NewLocalFencingController(logger, config, kubeClient)
+	service.Run(ctx)
 }

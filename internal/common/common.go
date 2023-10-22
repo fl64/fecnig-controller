@@ -3,6 +3,9 @@ package common
 import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"os"
 )
 
@@ -36,4 +39,21 @@ func NewLogger() *zap.Logger {
 		},
 	}
 	return zap.Must(config.Build())
+}
+
+func GetClientset() (*kubernetes.Clientset, error) {
+	var kubeClient *kubernetes.Clientset
+	config, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
+	if err != nil {
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	kubeClient, err = kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	return kubeClient, nil
 }

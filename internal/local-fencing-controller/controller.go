@@ -7,8 +7,6 @@ import (
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -23,27 +21,12 @@ type localFencingController struct {
 	wg                 sync.WaitGroup
 }
 
-func NewLocalFencingController(logger *zap.Logger, config Config) *localFencingController {
+func NewLocalFencingController(logger *zap.Logger, config Config, kubeClient *kubernetes.Clientset) *localFencingController {
 	return &localFencingController{
-		logger: logger,
-		config: config,
+		logger:     logger,
+		config:     config,
+		kubeClient: kubeClient,
 	}
-}
-
-func (lfc *localFencingController) getClientset() error {
-	config, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
-	if err != nil {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return err
-		}
-	}
-
-	lfc.kubeClient, err = kubernetes.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-	return err
 }
 
 func (lfc *localFencingController) setNodeLabel(ctx context.Context) error {
@@ -143,12 +126,7 @@ func (lfc *localFencingController) checkAPI(ctx context.Context) {
 	}
 }
 
-func (lfc *localFencingController) Run(ctx context.Context) error {
-	var err error
-	err = lfc.getClientset()
-	if err != nil {
-		return err
-	}
+func (lfc *localFencingController) Run(ctx context.Context) {
 
 	lfc.logger.Info("Start feeding watchdog")
 	lfc.wg.Add(1)
@@ -159,5 +137,4 @@ func (lfc *localFencingController) Run(ctx context.Context) error {
 	go lfc.checkAPI(ctx)
 
 	lfc.wg.Wait()
-	return nil
 }
