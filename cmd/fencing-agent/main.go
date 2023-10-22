@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/fecning-controller/internal/common"
-	"github.com/fecning-controller/internal/local-fencing-controller"
+	fencing_agent "github.com/fecning-controller/internal/fencing-agent"
 	_ "github.com/jpfuentes2/go-env/autoload"
 	"go.uber.org/zap"
 	"os"
@@ -32,7 +32,7 @@ func main() {
 		cancel()
 	}()
 
-	var config local_fencing_controller.Config
+	var config fencing_agent.Config
 	err := config.Load()
 	if err != nil {
 		logger.Fatal("Can't read env vars", zap.Error(err))
@@ -45,6 +45,6 @@ func main() {
 		logger.Fatal("Can't create kubernetes clientSet", zap.Error(err))
 	}
 
-	service := local_fencing_controller.NewLocalFencingController(logger, config, kubeClient)
+	service := fencing_agent.NewLocalFencingController(logger, config, kubeClient)
 	service.Run(ctx)
 }

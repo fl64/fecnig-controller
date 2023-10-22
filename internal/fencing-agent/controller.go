@@ -1,4 +1,4 @@
-package local_fencing_controller
+package fencing_agent
 
 import (
 	"context"
