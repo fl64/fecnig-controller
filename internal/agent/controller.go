@@ -113,7 +113,7 @@ func (fa *FencingAgent) Run(ctx context.Context) {
 	if err != nil {
 		fa.logger.Fatal("Can't set node label", zap.Error(err))
 	} else {
-		fa.logger.Info("Set node label", zap.String("node", fa.config.NodeName))
+		fa.logger.Info("Node label is set", zap.String("node", fa.config.NodeName))
 	}
 
 	fa.logger.Info("Start API check")
@@ -126,6 +126,6 @@ func (fa *FencingAgent) Run(ctx context.Context) {
 	if err != nil {
 		fa.logger.Error("Can't remove node label", zap.String("node", fa.config.NodeName), zap.Error(err))
 	} else {
-		fa.logger.Info("Remove node label", zap.String("node", fa.config.NodeName))
+		fa.logger.Info("Node label is removed", zap.String("node", fa.config.NodeName))
 	}
 }

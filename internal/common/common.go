@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes"
@@ -13,32 +14,19 @@ const FecningNodeValue = "true"
 const FecningNodeLabel = "deckhouse.io/fencing-enabled"
 
 func NewLogger() *zap.Logger {
-	encoderConfig := zap.NewDevelopmentEncoderConfig()
-	encoderConfig.TimeKey = "timestamp"
-	encoderConfig.MessageKey = "msg"
-	encoderConfig.LevelKey = "level"
-	encoderConfig.CallerKey = "caller"
-	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-
-	config := zap.Config{
-		Level:             zap.NewAtomicLevelAt(zap.DebugLevel),
-		Encoding:          "json",
-		Development:       false,
-		DisableCaller:     false,
-		DisableStacktrace: false,
-		Sampling:          nil,
-		EncoderConfig:     encoderConfig,
-		OutputPaths: []string{
-			"stdout",
-		},
-		ErrorOutputPaths: []string{
-			"stderr",
-		},
-		InitialFields: map[string]interface{}{
-			"pid": os.Getpid(),
-		},
+	zapConfig := zap.NewProductionConfig()
+	zapConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	zapConfig.EncoderConfig.TimeKey = "timestamp"
+	zapConfig.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+	if level := os.Getenv("LOG_LEVEL"); level != "" {
+		var parsedLevel zap.AtomicLevel
+		err := parsedLevel.UnmarshalText([]byte(level))
+		if err == nil {
+			zapConfig.Level = parsedLevel
+		}
 	}
-	return zap.Must(config.Build())
+	fmt.Println(zapConfig.Level)
+	return zap.Must(zapConfig.Build())
 }
 
 func GetClientset() (*kubernetes.Clientset, error) {

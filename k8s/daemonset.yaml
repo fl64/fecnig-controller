@@ -21,6 +21,8 @@ spec:
         - name: fencing-agent
           imagePullPolicy: Always
           env:
+            - name: LOG_LEVEL
+              value: info
             - name: WATCHDOG_DEVICE
               value: /dev/null
             - name: NODE_NAME
