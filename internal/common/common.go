@@ -1,12 +1,12 @@
 package common
 
 import (
-	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"os"
 )
 
@@ -25,21 +25,31 @@ func NewLogger() *zap.Logger {
 			zapConfig.Level = parsedLevel
 		}
 	}
-	fmt.Println(zapConfig.Level)
 	return zap.Must(zapConfig.Build())
 }
 
-func GetClientset() (*kubernetes.Clientset, error) {
-	var kubeClient *kubernetes.Clientset
-	config, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
-	if err != nil {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, err
+// Reimplementation of clientcmd.buildConfig to avoid warn message
+func buildConfig(kubeconfigPath string) (*rest.Config, error) {
+	if kubeconfigPath == "" {
+		kubeconfig, err := rest.InClusterConfig()
+		if err == nil {
+			return kubeconfig, nil
 		}
 	}
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}}).ClientConfig()
+}
 
-	kubeClient, err = kubernetes.NewForConfig(config)
+func GetClientset() (*kubernetes.Clientset, error) {
+	var restConfig *rest.Config
+	var kubeClient *kubernetes.Clientset
+	var err error
+	restConfig, err = buildConfig(os.Getenv("KUBECONFIG"))
+	if err != nil {
+		return nil, err
+	}
+	kubeClient, err = kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
 	}
