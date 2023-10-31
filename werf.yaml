@@ -30,7 +30,7 @@ import:
     after: install
 docker:
   WORKDIR: "/app"
-  CMD: ["/fencing-agent"]
+  CMD: ["/app/fencing-agent"]
   LABEL:
     maintainer: "flsixtyfour@gmail.com"
     org.label-schema.vcs-url: "https://github.com/fl64/fencint-agent"
