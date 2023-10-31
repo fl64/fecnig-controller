@@ -1,4 +1,4 @@
-package fencing_agent
+package agent
 
 import (
 	"context"
