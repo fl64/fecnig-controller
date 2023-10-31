@@ -7,6 +7,7 @@ spec:
   template:
     metadata:
     spec:
+      serviceAccountName: fencing-agent
 #      tolerations:
 #        # these tolerations are to have the daemonset runnable on control plane nodes
 #        # remove them if your control plane nodes should not run pods
@@ -19,6 +20,11 @@ spec:
       containers:
         - name: fencing-agent
           imagePullPolicy: Always
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           image: docker.io/fl64/fencing-agent:v0.0.0-dev0
           resources:
             limits:

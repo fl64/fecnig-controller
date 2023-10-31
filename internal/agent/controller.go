@@ -59,8 +59,7 @@ func (lfc *localFencingController) removeNodeLabel(ctx context.Context) error {
 func (lfc *localFencingController) startWatchdogFeeding(ctx context.Context) {
 	watchdog, err := os.OpenFile(lfc.config.WatchdogDevice, os.O_WRONLY, 0)
 	if err != nil {
-		lfc.logger.Error("Unable to open watchdog device", zap.String("device", lfc.config.WatchdogDevice), zap.Error(err))
-		return
+		lfc.logger.Fatal("Unable to open watchdog device", zap.String("device", lfc.config.WatchdogDevice), zap.Error(err))
 	}
 	defer watchdog.Close()
 
