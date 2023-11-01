@@ -31,13 +31,13 @@ spec:
           imagePullPolicy: Always
           env:
             - name: KUBERNETES_API_TIMEOUT
-              value: 4s
+              value: 10s
             - name: WATCHDOG_HEARTBEAT_INTERVAL
               value: 5s
-            - name: NODE_CHECK_INTERVAL
-              value: 2s
+            - name: KUBERNETES_API_CHECK_INTERVAL
+              value: s
             - name: LOG_LEVEL
-              value: debug
+              value: info
             - name: WATCHDOG_DEVICE
               value: /dev/watchdog
             - name: NODE_NAME

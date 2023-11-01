@@ -4,6 +4,9 @@ metadata:
   name: allow-ingress
   namespace: fencing-agent
 spec:
-  endpointSelector: {}
+  #endpointSelector: {}
+  endpointSelector:
+    matchLabels:
+      killme: "true"
   egress:
     - {}
