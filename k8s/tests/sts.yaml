@@ -9,7 +9,7 @@ spec:
   selector:
     matchLabels:
       app: echo
-  replicas: 1
+  replicas: 2
   updateStrategy:
     type: RollingUpdate
   podManagementPolicy: OrderedReady
@@ -18,6 +18,19 @@ spec:
       labels:
         app: echo
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - echo
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
       containers:
         - name: nginx
           image: nginx

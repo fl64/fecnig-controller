@@ -9,4 +9,8 @@ spec:
   nodeGroups: ["*"]
   bundles: ["*"]
   content: |
+    bb-sync-file /etc/modprobe.d/softdog.conf - << "EOF"
+    options soft_margin=90
+    EOF
     modprobe softdog soft_margin=90
+    
