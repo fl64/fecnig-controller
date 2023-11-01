@@ -1,0 +1,9 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress
+  namespace: fencing-agent
+spec:
+  endpointSelector: {}
+  egress:
+    - {}

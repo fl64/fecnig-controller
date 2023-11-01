@@ -5,7 +5,9 @@ metadata:
   namespace: default
 spec:
   template:
-    metadata: {}
+    metadata:
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/fencing-agent: unconfined
     spec:
       serviceAccountName: fencing-agent
 #      tolerations:
@@ -19,6 +21,13 @@ spec:
 #          effect: NoSchedule
       containers:
         - name: fencing-agent
+          securityContext:
+            privileged: true
+            #runAsUser: 0
+#            allowPrivilegeEscalation: true
+#            capabilities:
+#              add: [ "ALL" ]
+          #command: ["tail", "-f", "/dev/null"]
           imagePullPolicy: Always
           env:
             - name: LOG_LEVEL
@@ -40,7 +49,7 @@ spec:
           volumeMounts:
             - name: watchdog
               mountPath: /dev/watchdog
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 10
       volumes:
         - name: watchdog
           hostPath:

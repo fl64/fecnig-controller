@@ -8,6 +8,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"os"
+	"time"
 )
 
 const FecningNodeValue = "true"
@@ -49,6 +50,7 @@ func GetClientset() (*kubernetes.Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	restConfig.Timeout = 10 * time.Second
 	kubeClient, err = kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err

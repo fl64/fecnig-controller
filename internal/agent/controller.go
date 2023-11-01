@@ -100,7 +100,7 @@ func (fa *FencingAgent) checkAPI(ctx context.Context) {
 				continue
 			}
 			fa.needToFeedWatchdog.Store(true)
-			fa.logger.Debug("Node check - OK")
+			fa.logger.Debug("API is available")
 		case <-ctx.Done():
 			fa.logger.Debug("Finishing the API check")
 			return
