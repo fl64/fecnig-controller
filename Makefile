@@ -7,9 +7,10 @@ build:
 deploy:
 	kubectl apply -k k8s/
 
-
 undeploy:
 	kubectl delete -k k8s/
+
+ud: undeploy deploy
 
 enable-watchdog:
 	kubectl apply -f k8s/tests/ngs-enable.yaml

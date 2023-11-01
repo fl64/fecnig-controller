@@ -30,6 +30,12 @@ spec:
           #command: ["tail", "-f", "/dev/null"]
           imagePullPolicy: Always
           env:
+            - name: KUBERNETES_API_TIMEOUT
+              value: 4s
+            - name: WATCHDOG_HEARTBEAT_INTERVAL
+              value: 5s
+            - name: NODE_CHECK_INTERVAL
+              value: 2s
             - name: LOG_LEVEL
               value: debug
             - name: WATCHDOG_DEVICE
