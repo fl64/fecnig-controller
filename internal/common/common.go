@@ -12,7 +12,7 @@ import (
 )
 
 const FecningNodeValue = "true"
-const FecningNodeLabel = "deckhouse.io/fencing-enabled"
+const FecningNodeLabel = "node-manager.deckhouse.io/fencing-enabled"
 
 func NewLogger() *zap.Logger {
 	zapConfig := zap.NewProductionConfig()

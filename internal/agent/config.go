@@ -6,11 +6,11 @@ import (
 )
 
 type Config struct {
-	WatchdogDevice            string        `env:"WATCHDOG_DEVICE" env-default:"/dev/watchdog"`
-	WatchdogHeartbeatInterval time.Duration `env:"WATCHDOG_HEARTBEAT_INTERVAL" env-default:"5s"`
-	NodeCheckInterval         time.Duration `env:"NODE_CHECK_INTERVAL" env-default:"5s"`
-	NodeName                  string        `env:"NODE_NAME"`
-	KubernetesAPITimeout      time.Duration `env:"KUBERNETES_API_TIMEOUT" env-default:"5s"`
+	WatchdogDevice             string        `env:"WATCHDOG_DEVICE" env-default:"/dev/watchdog"`
+	WatchdogHeartbeatInterval  time.Duration `env:"WATCHDOG_HEARTBEAT_INTERVAL" env-default:"5s"`
+	KubernetesAPICheckInterval time.Duration `env:"KUBERNETES_API_CHECK_INTERVAL" env-default:"5s"`
+	NodeName                   string        `env:"NODE_NAME"`
+	KubernetesAPITimeout       time.Duration `env:"KUBERNETES_API_TIMEOUT" env-default:"5s"`
 }
 
 func (c *Config) Load() error {

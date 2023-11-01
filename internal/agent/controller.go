@@ -89,11 +89,11 @@ func (fa *FencingAgent) startWatchdogFeeding(ctx context.Context) {
 }
 
 func (fa *FencingAgent) checkAPI(ctx context.Context) {
-	ticker := time.NewTicker(fa.config.NodeCheckInterval)
+	ticker := time.NewTicker(fa.config.KubernetesAPICheckInterval)
 	for {
 		select {
 		case <-ticker.C:
-			_, err := fa.kubeClient.CoreV1().Nodes().List(ctx, v1.ListOptions{})
+			_, err := fa.kubeClient.CoreV1().Nodes().Get(context.TODO(), fa.config.NodeName, v1.GetOptions{})
 			if err != nil {
 				fa.logger.Error("Can't reach API", zap.Error(err))
 				fa.needToFeedWatchdog.Store(false)
