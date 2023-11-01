@@ -10,6 +10,7 @@ type Config struct {
 	WatchdogHeartbeatInterval time.Duration `env:"WATCHDOG_HEARTBEAT_INTERVAL" env-default:"5s"`
 	NodeCheckInterval         time.Duration `env:"NODE_CHECK_INTERVAL" env-default:"5s"`
 	NodeName                  string        `env:"NODE_NAME"`
+	KubernetesAPITimeout      time.Duration `env:"KUBERNETES_API_TIMEOUT" env-default:"5s"`
 }
 
 func (c *Config) Load() error {

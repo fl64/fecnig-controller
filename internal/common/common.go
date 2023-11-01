@@ -42,7 +42,7 @@ func buildConfig(kubeconfigPath string) (*rest.Config, error) {
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}}).ClientConfig()
 }
 
-func GetClientset() (*kubernetes.Clientset, error) {
+func GetClientset(timeout time.Duration) (*kubernetes.Clientset, error) {
 	var restConfig *rest.Config
 	var kubeClient *kubernetes.Clientset
 	var err error
@@ -50,7 +50,7 @@ func GetClientset() (*kubernetes.Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	restConfig.Timeout = 10 * time.Second
+	restConfig.Timeout = timeout
 	kubeClient, err = kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err

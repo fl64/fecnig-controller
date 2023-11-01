@@ -40,7 +40,7 @@ func main() {
 
 	logger.Debug("Current config", zap.Reflect("config", config))
 
-	kubeClient, err := common.GetClientset()
+	kubeClient, err := common.GetClientset(config.KubernetesAPITimeout)
 	if err != nil {
 		logger.Fatal("Can't create kubernetes clientSet", zap.Error(err))
 	}
