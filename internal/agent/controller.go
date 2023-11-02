@@ -2,12 +2,11 @@ package agent
 
 import (
 	"context"
-	"fmt"
 	"github.com/fecning-controller/internal/common"
+	"github.com/fecning-controller/internal/watchdog"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"os"
 	"sync/atomic"
 	"time"
 )
@@ -55,34 +54,20 @@ func (fa *FencingAgent) removeNodeLabel(ctx context.Context) error {
 
 // https://github.com/facebook/openbmc/blob/97eb23c53b45222e3b1711870f1ebdc504f7c926/tools/flashy/lib/utils/system.go#L497
 func (fa *FencingAgent) startWatchdogFeeding(ctx context.Context) {
-	watchdog, err := os.OpenFile(fa.config.WatchdogDevice, os.O_WRONLY, 0)
-	if err != nil {
-		fa.logger.Error("Unable to open watchdog device", zap.String("device", fa.config.WatchdogDevice), zap.Error(err))
-		return
-	}
-	defer watchdog.Close()
-
-	feedWatchdog := func(s string) {
-		_, err := fmt.Fprint(watchdog, s)
-		if err != nil {
-			fa.logger.Error("Failed to write to watchdog device", zap.String("device", fa.config.WatchdogDevice))
-		}
-		watchdog.Sync()
-	}
 	ticker := time.NewTicker(fa.config.WatchdogHeartbeatInterval)
-	defer ticker.Stop()
+	wd := watchdog.NewWatchdog(fa.config.WatchDogTimeout)
+	go wd.Run(ctx)
 	for {
 		select {
 		case <-ticker.C:
 			if fa.needToFeedWatchdog.Load() {
 				fa.logger.Debug("Feeding watchdog")
-				feedWatchdog("1")
+				wd.Reset()
 			} else {
 				fa.logger.Debug("The API is unreachable, skip feeding watchdog")
 			}
 		case <-ctx.Done():
 			fa.logger.Info("Graceful stop of watchdog timer operation")
-			feedWatchdog("V")
 			return
 		}
 	}
