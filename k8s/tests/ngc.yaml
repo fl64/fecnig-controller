@@ -1,0 +1,16 @@
+apiVersion: deckhouse.io/v1alpha1
+kind: NodeGroupConfiguration
+metadata:
+  name: enable-softdog.sh
+  labels:
+    app: fecncing-agent
+spec:
+  weight: 99
+  nodeGroups: ["*"]
+  bundles: ["*"]
+  content: |
+    bb-sync-file /etc/modprobe.d/softdog.conf - << "EOF"
+    options soft_margin=90
+    EOF
+    modprobe softdog soft_margin=90
+    

@@ -1,0 +1,36 @@
+---
+project: fencing-agent
+configVersion: 1
+gitWorktree:
+  forceShallowClone: true
+---
+artifact: golang-builder
+from: golang:1.19-buster
+git:
+  - add: /
+    to: /usr/local/go/src/fencing-agent
+    stageDependencies:
+      install:
+        - '**/*'
+shell:
+  install:
+    - cd /usr/local/go/src/fencing-agent
+    - go mod download
+    - export GO111MODULE=on
+    - export GOOS=linux
+    - export CGO_ENABLED=0
+    - go build -v -ldflags "-w -s -X 'main.BuildDatetime=$(date --iso-8601=seconds)'" -o fencing-agent ./cmd/main.go
+---
+image: fl64/fencing-agent
+from: alpine:3.17
+import:
+  - artifact: golang-builder
+    add: /usr/local/go/src/fencing-agent/fencing-agent
+    to: /app/fencing-agent
+    after: install
+docker:
+  WORKDIR: "/app"
+  CMD: ["/app/fencing-agent"]
+  LABEL:
+    maintainer: "flsixtyfour@gmail.com"
+    org.label-schema.vcs-url: "https://github.com/fl64/fencint-agent"

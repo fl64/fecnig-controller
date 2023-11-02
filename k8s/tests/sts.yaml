@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: echo
+  namespace: default
+  labels:
+    app: echo
+spec:
+  selector:
+    matchLabels:
+      app: echo
+  replicas: 2
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: OrderedReady
+  template:
+    metadata:
+      labels:
+        app: echo
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - echo
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+  serviceName: echo
