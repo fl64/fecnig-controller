@@ -12,10 +12,11 @@ import (
 )
 
 type FencingAgent struct {
-	logger             *zap.Logger
-	config             Config
-	kubeClient         *kubernetes.Clientset
-	needToFeedWatchdog atomic.Bool
+	logger              *zap.Logger
+	config              Config
+	kubeClient          *kubernetes.Clientset
+	needToFeedWatchdog  atomic.Bool
+	maintenanceIsActive atomic.Bool
 }
 
 func NewLocalFencingController(logger *zap.Logger, config Config, kubeClient *kubernetes.Clientset) *FencingAgent {
@@ -26,33 +27,6 @@ func NewLocalFencingController(logger *zap.Logger, config Config, kubeClient *ku
 	}
 }
 
-func (fa *FencingAgent) setNodeLabel(ctx context.Context) error {
-	node, err := fa.kubeClient.CoreV1().Nodes().Get(ctx, fa.config.NodeName, v1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	node.Labels[common.FecningNodeLabel] = common.FecningNodeValue
-	_, err = fa.kubeClient.CoreV1().Nodes().Update(ctx, node, v1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (fa *FencingAgent) removeNodeLabel(ctx context.Context) error {
-	node, err := fa.kubeClient.CoreV1().Nodes().Get(context.TODO(), fa.config.NodeName, v1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	delete(node.Labels, common.FecningNodeLabel)
-	_, err = fa.kubeClient.CoreV1().Nodes().Update(context.TODO(), node, v1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// https://github.com/facebook/openbmc/blob/97eb23c53b45222e3b1711870f1ebdc504f7c926/tools/flashy/lib/utils/system.go#L497
 func (fa *FencingAgent) startWatchdogFeeding(ctx context.Context) {
 	ticker := time.NewTicker(fa.config.WatchdogHeartbeatInterval)
 	wd := watchdog.NewWatchdog(fa.config.WatchDogTimeout)
@@ -64,7 +38,12 @@ func (fa *FencingAgent) startWatchdogFeeding(ctx context.Context) {
 				fa.logger.Debug("Feeding watchdog")
 				wd.Reset()
 			} else {
-				fa.logger.Debug("The API is unreachable, skip feeding watchdog")
+				if !fa.maintenanceIsActive.Load() {
+					fa.logger.Debug("The API is unreachable, skip feeding watchdog")
+				} else {
+					fa.logger.Debug("The API is unreachable, but the node was in maintenance mode, so everything looks ok")
+					wd.Reset()
+				}
 			}
 		case <-ctx.Done():
 			fa.logger.Info("Graceful stop of watchdog timer operation")
@@ -78,7 +57,7 @@ func (fa *FencingAgent) checkAPI(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			_, err := fa.kubeClient.CoreV1().Nodes().Get(context.TODO(), fa.config.NodeName, v1.GetOptions{})
+			node, err := fa.kubeClient.CoreV1().Nodes().Get(context.TODO(), fa.config.NodeName, v1.GetOptions{})
 			if err != nil {
 				fa.logger.Error("Can't reach API", zap.Error(err))
 				fa.needToFeedWatchdog.Store(false)
@@ -86,6 +65,16 @@ func (fa *FencingAgent) checkAPI(ctx context.Context) {
 			}
 			fa.needToFeedWatchdog.Store(true)
 			fa.logger.Debug("API is available")
+
+			_, disruptionApprovedAnnotationExists := node.Annotations[common.DisruptionApprovedAnnotation]
+			_, approvedAnnotationExists := node.Annotations[common.ApprovedAnnotation]
+			if disruptionApprovedAnnotationExists || approvedAnnotationExists {
+				fa.logger.Warn("Node is in maintenance mode")
+				fa.maintenanceIsActive.Store(true)
+			} else {
+				fa.maintenanceIsActive.Store(false)
+			}
+
 		case <-ctx.Done():
 			fa.logger.Debug("Finishing the API check")
 			return
@@ -94,23 +83,9 @@ func (fa *FencingAgent) checkAPI(ctx context.Context) {
 }
 
 func (fa *FencingAgent) Run(ctx context.Context) {
-	err := fa.setNodeLabel(ctx)
-	if err != nil {
-		fa.logger.Fatal("Can't set node label", zap.Error(err))
-	} else {
-		fa.logger.Info("Node label is set", zap.String("node", fa.config.NodeName))
-	}
-
 	fa.logger.Info("Start API check")
 	go fa.checkAPI(ctx)
 
 	fa.logger.Info("Start feeding watchdog")
 	fa.startWatchdogFeeding(ctx)
-
-	err = fa.removeNodeLabel(context.TODO())
-	if err != nil {
-		fa.logger.Error("Can't remove node label", zap.String("node", fa.config.NodeName), zap.Error(err))
-	} else {
-		fa.logger.Info("Node label is removed", zap.String("node", fa.config.NodeName))
-	}
 }

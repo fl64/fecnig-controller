@@ -11,8 +11,12 @@ import (
 	"time"
 )
 
-const FecningNodeValue = "true"
-const FecningNodeLabel = "node-manager.deckhouse.io/fencing-enabled"
+const (
+	DisruptionApprovedAnnotation = `update.node.deckhouse.io/disruption-approved`
+	ApprovedAnnotation           = `update.node.deckhouse.io/approved`
+	FecningNodeValue             = "true"
+	FecningNodeLabel             = "node-manager.deckhouse.io/fencing-enabled"
+)
 
 func NewLogger() *zap.Logger {
 	zapConfig := zap.NewProductionConfig()
@@ -31,7 +35,7 @@ func NewLogger() *zap.Logger {
 	return zap.Must(zapConfig.Build())
 }
 
-// Reimplementation of clientcmd.buildConfig to avoid warn message
+// Reimplementation of clientcmd.buildConfig to avoid default warn message
 func buildConfig(kubeconfigPath string) (*rest.Config, error) {
 	if kubeconfigPath == "" {
 		kubeconfig, err := rest.InClusterConfig()
@@ -48,11 +52,14 @@ func GetClientset(timeout time.Duration) (*kubernetes.Clientset, error) {
 	var restConfig *rest.Config
 	var kubeClient *kubernetes.Clientset
 	var err error
+
 	restConfig, err = buildConfig(os.Getenv("KUBECONFIG"))
 	if err != nil {
 		return nil, err
 	}
+
 	restConfig.Timeout = timeout
+
 	kubeClient, err = kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
