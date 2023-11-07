@@ -11,6 +11,7 @@ type Config struct {
 	KubernetesAPICheckInterval time.Duration `env:"KUBERNETES_API_CHECK_INTERVAL" env-default:"5s"`
 	NodeName                   string        `env:"NODE_NAME"`
 	KubernetesAPITimeout       time.Duration `env:"KUBERNETES_API_TIMEOUT" env-default:"5s"`
+	WatchDogTimeout            time.Duration `env:"WATCHDOG_TIMEOUT" env-default:"60s"`
 }
 
 func (c *Config) Load() error {
