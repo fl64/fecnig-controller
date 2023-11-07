@@ -15,34 +15,43 @@ type FencingAgent struct {
 	logger              *zap.Logger
 	config              Config
 	kubeClient          *kubernetes.Clientset
+	watchDog            watchdog.WatchDog
 	needToFeedWatchdog  atomic.Bool
 	maintenanceIsActive atomic.Bool
 }
 
-func NewLocalFencingController(logger *zap.Logger, config Config, kubeClient *kubernetes.Clientset) *FencingAgent {
+func NewFencingAgent(logger *zap.Logger, config Config, kubeClient *kubernetes.Clientset, wd watchdog.WatchDog) *FencingAgent {
 	return &FencingAgent{
 		logger:     logger,
 		config:     config,
 		kubeClient: kubeClient,
+		watchDog:   wd,
 	}
 }
 
 func (fa *FencingAgent) startWatchdogFeeding(ctx context.Context) {
 	ticker := time.NewTicker(fa.config.WatchdogHeartbeatInterval)
-	wd := watchdog.NewWatchdog(fa.config.WatchDogTimeout)
-	go wd.Run(ctx)
+
+	go func() {
+		err := fa.watchDog.Run(ctx)
+		if err != nil {
+			fa.logger.Fatal("Can't run watchdog", zap.Error(err))
+			return
+		}
+	}()
+
 	for {
 		select {
 		case <-ticker.C:
 			if fa.needToFeedWatchdog.Load() {
 				fa.logger.Debug("Feeding watchdog")
-				wd.Reset()
+				fa.watchDog.ResetCountdown()
 			} else {
 				if !fa.maintenanceIsActive.Load() {
 					fa.logger.Debug("The API is unreachable, skip feeding watchdog")
 				} else {
 					fa.logger.Debug("The API is unreachable, but the node was in maintenance mode, so everything looks ok")
-					wd.Reset()
+					fa.watchDog.ResetCountdown()
 				}
 			}
 		case <-ctx.Done():

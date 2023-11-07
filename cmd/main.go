@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/fecning-controller/internal/agent"
 	"github.com/fecning-controller/internal/common"
+	"github.com/fecning-controller/internal/watchdog/softdog"
 	_ "github.com/jpfuentes2/go-env/autoload"
 	"go.uber.org/zap"
 	"os"
@@ -45,6 +46,8 @@ func main() {
 		logger.Fatal("Can't create kubernetes clientSet", zap.Error(err))
 	}
 
-	service := agent.NewLocalFencingController(logger, config, kubeClient)
+	//wd := sysrq.NewWatchdog(config.WatchDogTimeout)
+	wd := softdog.NewWatchdog(config.WatchdogDevice)
+	service := agent.NewFencingAgent(logger, config, kubeClient, wd)
 	service.Run(ctx)
 }
