@@ -30,7 +30,7 @@ func NewFencingAgent(logger *zap.Logger, config Config, kubeClient *kubernetes.C
 }
 
 func (fa *FencingAgent) startWatchdogFeeding(ctx context.Context) {
-	ticker := time.NewTicker(fa.config.WatchdogHeartbeatInterval)
+	ticker := time.NewTicker(fa.config.WatchdogFeedInterval)
 
 	go func() {
 		err := fa.watchDog.Run(ctx)

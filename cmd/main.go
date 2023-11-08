@@ -48,6 +48,6 @@ func main() {
 
 	//wd := sysrq.NewWatchdog(config.WatchDogTimeout)
 	wd := softdog.NewWatchdog(config.WatchdogDevice)
-	service := agent.NewFencingAgent(logger, config, kubeClient, wd)
-	service.Run(ctx)
+	fencingAgent := agent.NewFencingAgent(logger, config, kubeClient, wd)
+	fencingAgent.Run(ctx)
 }
