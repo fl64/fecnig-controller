@@ -29,72 +29,88 @@ func NewFencingAgent(logger *zap.Logger, config Config, kubeClient *kubernetes.C
 	}
 }
 
-func (fa *FencingAgent) startWatchdogFeeding(ctx context.Context) {
-	ticker := time.NewTicker(fa.config.WatchdogFeedInterval)
-
-	go func() {
-		err := fa.watchDog.Run(ctx)
-		if err != nil {
-			fa.logger.Fatal("Can't run watchdog", zap.Error(err))
-			return
-		}
-	}()
-
-	for {
-		select {
-		case <-ticker.C:
-			if fa.needToFeedWatchdog.Load() {
-				fa.logger.Debug("Feeding watchdog")
-				fa.watchDog.ResetCountdown()
-			} else {
-				if !fa.maintenanceIsActive.Load() {
-					fa.logger.Debug("The API is unreachable, skip feeding watchdog")
-				} else {
-					fa.logger.Debug("The API is unreachable, but the node was in maintenance mode, so everything looks ok")
-					fa.watchDog.ResetCountdown()
-				}
-			}
-		case <-ctx.Done():
-			fa.logger.Info("Graceful stop of watchdog timer operation")
-			return
-		}
+func (fa *FencingAgent) setNodeLabel(ctx context.Context) error {
+	node, err := fa.kubeClient.CoreV1().Nodes().Get(ctx, fa.config.NodeName, v1.GetOptions{})
+	if err != nil {
+		return err
 	}
+	node.Labels[common.FecningNodeLabel] = common.FecningNodeValue
+	_, err = fa.kubeClient.CoreV1().Nodes().Update(ctx, node, v1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (fa *FencingAgent) checkAPI(ctx context.Context) {
+func (fa *FencingAgent) removeNodeLabel(ctx context.Context) error {
+	node, err := fa.kubeClient.CoreV1().Nodes().Get(context.TODO(), fa.config.NodeName, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	delete(node.Labels, common.FecningNodeLabel)
+	_, err = fa.kubeClient.CoreV1().Nodes().Update(context.TODO(), node, v1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (fa *FencingAgent) Run(ctx context.Context) error {
 	ticker := time.NewTicker(fa.config.KubernetesAPICheckInterval)
+	var APIIsAvailable bool
+	var MaintenanceMode bool
+	var err error
+	err = fa.watchDog.Start()
+	if err != nil {
+		return err
+	}
 	for {
 		select {
 		case <-ticker.C:
 			node, err := fa.kubeClient.CoreV1().Nodes().Get(context.TODO(), fa.config.NodeName, v1.GetOptions{})
 			if err != nil {
 				fa.logger.Error("Can't reach API", zap.Error(err))
-				fa.needToFeedWatchdog.Store(false)
-				continue
+				APIIsAvailable = false
+			} else {
+				fa.logger.Debug("API is available")
+				APIIsAvailable = true
 			}
-			fa.needToFeedWatchdog.Store(true)
-			fa.logger.Debug("API is available")
 
 			_, disruptionApprovedAnnotationExists := node.Annotations[common.DisruptionApprovedAnnotation]
 			_, approvedAnnotationExists := node.Annotations[common.ApprovedAnnotation]
 			if disruptionApprovedAnnotationExists || approvedAnnotationExists {
 				fa.logger.Warn("Node is in maintenance mode")
-				fa.maintenanceIsActive.Store(true)
+				MaintenanceMode = true
+				err = fa.watchDog.Stop()
+				if err != nil {
+					fa.logger.Error("Can't stop watchdog", zap.Error(err))
+				}
+				continue
 			} else {
-				fa.maintenanceIsActive.Store(false)
+				if MaintenanceMode {
+					err = fa.watchDog.Start()
+					if err != nil {
+						fa.logger.Error("Can't start watchdog", zap.Error(err))
+						continue
+					}
+				}
+				MaintenanceMode = false
+			}
+
+			if APIIsAvailable {
+				err = fa.watchDog.Feed()
+				if err != nil {
+					fa.logger.Error("Can't feed watchdog", zap.Error(err))
+				}
 			}
 
 		case <-ctx.Done():
 			fa.logger.Debug("Finishing the API check")
-			return
+			err = fa.watchDog.Stop()
+			if err != nil {
+				fa.logger.Error("Can't stop watchdog", zap.Error(err))
+			}
+			return err
 		}
 	}
-}
-
-func (fa *FencingAgent) Run(ctx context.Context) {
-	fa.logger.Info("Start API check")
-	go fa.checkAPI(ctx)
-
-	fa.logger.Info("Start feeding watchdog")
-	fa.startWatchdogFeeding(ctx)
 }

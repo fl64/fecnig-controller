@@ -46,8 +46,10 @@ func main() {
 		logger.Fatal("Can't create kubernetes clientSet", zap.Error(err))
 	}
 
-	//wd := sysrq.NewWatchdog(config.WatchDogTimeout)
 	wd := softdog.NewWatchdog(config.WatchdogDevice)
 	fencingAgent := agent.NewFencingAgent(logger, config, kubeClient, wd)
-	fencingAgent.Run(ctx)
+	err = fencingAgent.Run(ctx)
+	if err != nil {
+		logger.Fatal("Can't run fencing-agent", zap.Error(err))
+	}
 }

@@ -1,50 +1,56 @@
 package softdog
 
 import (
-	"context"
 	"fmt"
 	"os"
 )
 
 type WatchDog struct {
-	device         string
-	resetTimerChan chan struct{}
-	file           *os.File
+	device string
+	file   *os.File
 }
 
 func NewWatchdog(device string) *WatchDog {
-	resetTimerChan := make(chan struct{})
 	return &WatchDog{
-		device:         device,
-		resetTimerChan: resetTimerChan,
+		device: device,
 	}
 }
 
-func (w WatchDog) ResetCountdown() {
-	w.resetTimerChan <- struct{}{}
+func (w WatchDog) write(s string) error {
+	var err error
+	_, err = fmt.Fprint(w.file, s)
+	if err != nil {
+		return err
+	}
+	err = w.file.Sync()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (w *WatchDog) Run(ctx context.Context) error {
+func (w WatchDog) Start() error {
 	var err error
 	w.file, err = os.OpenFile(w.device, os.O_WRONLY, 0)
 	if err != nil {
 		return fmt.Errorf("Unable to open watchdog device", err)
 	}
-	defer w.file.Close()
+	return nil
+}
 
-	feedWatchdog := func(s string) {
-		fmt.Fprint(w.file, s)
-		w.file.Sync()
-	}
+func (w WatchDog) Feed() error {
+	return w.write("1")
+}
 
-	for {
-		select {
-		case <-ctx.Done():
-			feedWatchdog("V")
-			return nil
-		case <-w.resetTimerChan:
-			feedWatchdog("1")
-			// как гарантировать что успеет?
-		}
+func (w WatchDog) Stop() error {
+	var err error
+	err = w.write("V")
+	if err != nil {
+		return err
 	}
+	err = w.file.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
