@@ -1,50 +1,53 @@
 package softdog
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"os"
 )
 
 type WatchDog struct {
-	device         string
-	resetTimerChan chan struct{}
-	file           *os.File
+	watchdogDeviceName string
+	watchdogDevice     *os.File
 }
 
 func NewWatchdog(device string) *WatchDog {
-	resetTimerChan := make(chan struct{})
 	return &WatchDog{
-		device:         device,
-		resetTimerChan: resetTimerChan,
+		watchdogDeviceName: device,
 	}
 }
 
-func (w WatchDog) ResetCountdown() {
-	w.resetTimerChan <- struct{}{}
-}
-
-func (w *WatchDog) Run(ctx context.Context) error {
+func (w *WatchDog) Start() error {
 	var err error
-	w.file, err = os.OpenFile(w.device, os.O_WRONLY, 0)
+	w.watchdogDevice, err = os.OpenFile(w.watchdogDeviceName, os.O_WRONLY, 0)
 	if err != nil {
-		return fmt.Errorf("Unable to open watchdog device", err)
+		return fmt.Errorf("Unable to open watchdog device %w", err)
 	}
-	defer w.file.Close()
+	return nil
+}
 
-	feedWatchdog := func(s string) {
-		fmt.Fprint(w.file, s)
-		w.file.Sync()
+func (w *WatchDog) Feed() error {
+	_, err := w.watchdogDevice.Write([]byte{'1'})
+	if err != nil {
+		return fmt.Errorf("Unable to feed watchdog %w", err)
 	}
+	return nil
+}
 
-	for {
-		select {
-		case <-ctx.Done():
-			feedWatchdog("V")
+func (w *WatchDog) Stop() error {
+	// Attempt a Magic Close to disarm the watchdog device
+	_, err := w.watchdogDevice.Write([]byte{'V'})
+	if err != nil {
+		// watchdog already was disarmed
+		if errors.Is(err, os.ErrClosed) {
 			return nil
-		case <-w.resetTimerChan:
-			feedWatchdog("1")
-			// как гарантировать что успеет?
+		} else {
+			return fmt.Errorf("Unable to disarm watchdog %w", err)
 		}
 	}
+	err = w.watchdogDevice.Close()
+	if err != nil {
+		return fmt.Errorf("Unable to close watchdog device %w", err)
+	}
+	return nil
 }

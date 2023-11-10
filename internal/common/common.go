@@ -11,11 +11,6 @@ import (
 	"time"
 )
 
-const (
-	DisruptionApprovedAnnotation = `update.node.deckhouse.io/disruption-approved`
-	ApprovedAnnotation           = `update.node.deckhouse.io/approved`
-)
-
 func NewLogger() *zap.Logger {
 	zapConfig := zap.NewProductionConfig()
 	zapConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder

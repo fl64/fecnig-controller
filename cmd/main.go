@@ -12,6 +12,8 @@ import (
 	"syscall"
 )
 
+var BuildDatetime = "none"
+
 func main() {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -19,6 +21,8 @@ func main() {
 
 	logger := common.NewLogger()
 	defer logger.Sync()
+
+	logger.Info("Fencing-agent build time " + BuildDatetime)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan,
@@ -36,18 +40,20 @@ func main() {
 	var config agent.Config
 	err := config.Load()
 	if err != nil {
-		logger.Fatal("Can't read env vars", zap.Error(err))
+		logger.Fatal("Unable to read env vars", zap.Error(err))
 	}
 
 	logger.Debug("Current config", zap.Reflect("config", config))
 
 	kubeClient, err := common.GetClientset(config.KubernetesAPITimeout)
 	if err != nil {
-		logger.Fatal("Can't create kubernetes clientSet", zap.Error(err))
+		logger.Fatal("Unable to create kubernetes clientSet", zap.Error(err))
 	}
 
-	//wd := sysrq.NewWatchdog(config.WatchDogTimeout)
 	wd := softdog.NewWatchdog(config.WatchdogDevice)
 	fencingAgent := agent.NewFencingAgent(logger, config, kubeClient, wd)
-	fencingAgent.Run(ctx)
+	err = fencingAgent.Run(ctx)
+	if err != nil {
+		logger.Fatal("Unable run fencing-agent", zap.Error(err))
+	}
 }
