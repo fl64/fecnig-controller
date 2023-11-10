@@ -12,6 +12,8 @@ import (
 	"syscall"
 )
 
+var BuildDatetime = "none"
+
 func main() {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -19,6 +21,8 @@ func main() {
 
 	logger := common.NewLogger()
 	defer logger.Sync()
+
+	logger.Info("Fencing-agent build time " + BuildDatetime)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan,

@@ -1,6 +1,7 @@
 package softdog
 
 import (
+	"errors"
 	"fmt"
 	"os"
 )
@@ -37,7 +38,11 @@ func (w *WatchDog) Stop() error {
 	// Attempt a Magic Close to disarm the watchdog device
 	_, err := w.watchdogDevice.Write([]byte{'V'})
 	if err != nil {
-		return fmt.Errorf("Unable to disarm watchdog %w", err)
+		if errors.Is(err, os.ErrClosed) {
+			return nil
+		} else {
+			return fmt.Errorf("Unable to disarm watchdog %w", err)
+		}
 	}
 	err = w.watchdogDevice.Close()
 	if err != nil {

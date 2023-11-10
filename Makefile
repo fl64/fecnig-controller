@@ -20,3 +20,4 @@ enable-api:
 
 disable-api:
 	kubectl apply  -f k8s/tests/cnp.yaml
+
