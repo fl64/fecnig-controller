@@ -10,14 +10,13 @@ import (
 )
 
 const (
-	FecningNodeValue = "true"
 	FecningNodeLabel = "node-manager.deckhouse.io/fencing-enabled"
 )
 
 var maintanenceAnnotations = [...]string{
 	`update.node.deckhouse.io/disruption-approved`,
 	`update.node.deckhouse.io/approved`,
-	`test/test`,
+	`node-manager.deckhouse.io/fencing-disable`,
 }
 
 type FencingAgent struct {
@@ -41,7 +40,7 @@ func (fa *FencingAgent) setNodeLabel(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	node.Labels[FecningNodeLabel] = FecningNodeValue
+	node.Labels[FecningNodeLabel] = ""
 	_, err = fa.kubeClient.CoreV1().Nodes().Update(ctx, node, v1.UpdateOptions{})
 	if err != nil {
 		return err
@@ -122,6 +121,7 @@ func (fa *FencingAgent) Run(ctx context.Context) error {
 			for _, annotation := range maintanenceAnnotations {
 				_, annotationExists := node.Annotations[annotation]
 				if annotationExists {
+					fa.logger.Info("Maintenance annotation found", zap.String("annotation", annotation))
 					maintanenceAnnotationsExists = true
 				}
 			}
