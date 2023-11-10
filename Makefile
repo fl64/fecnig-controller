@@ -13,7 +13,7 @@ undeploy:
 ud: undeploy deploy
 
 enable-watchdog:
-	kubectl apply -f k8s/tests/ngs-enable.yaml
+	kubectl apply -f k8s/tests/ngc.yaml
 
 enable-api:
 	kubectl delete -f k8s/tests/cnp.yaml

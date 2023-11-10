@@ -32,19 +32,17 @@ spec:
           env:
             - name: KUBERNETES_API_TIMEOUT
               value: 10s
-            - name: WATCHDOG_HEARTBEAT_INTERVAL
-              value: 5s
             - name: KUBERNETES_API_CHECK_INTERVAL
-              value: s
+              value: 5s
             - name: LOG_LEVEL
-              value: info
+              value: debug
             - name: WATCHDOG_DEVICE
               value: /dev/watchdog
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          image: docker.io/fl64/fencing-agent:v0.0.0-dev0
+          image: docker.io/fl64/fencing-agent:v0.0.1-dev0
           resources:
             limits:
               cpu: 100m
