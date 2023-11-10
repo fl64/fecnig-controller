@@ -6,51 +6,42 @@ import (
 )
 
 type WatchDog struct {
-	device string
-	file   *os.File
+	watchdogDeviceName string
+	watchdogDevice     *os.File
 }
 
 func NewWatchdog(device string) *WatchDog {
 	return &WatchDog{
-		device: device,
+		watchdogDeviceName: device,
 	}
 }
 
-func (w WatchDog) write(s string) error {
+func (w *WatchDog) Start() error {
 	var err error
-	_, err = fmt.Fprint(w.file, s)
+	w.watchdogDevice, err = os.OpenFile(w.watchdogDeviceName, os.O_WRONLY, 0)
 	if err != nil {
-		return err
-	}
-	err = w.file.Sync()
-	if err != nil {
-		return err
+		return fmt.Errorf("Unable to open watchdog device %w", err)
 	}
 	return nil
 }
 
-func (w WatchDog) Start() error {
-	var err error
-	w.file, err = os.OpenFile(w.device, os.O_WRONLY, 0)
+func (w *WatchDog) Feed() error {
+	_, err := w.watchdogDevice.Write([]byte{'1'})
 	if err != nil {
-		return fmt.Errorf("Unable to open watchdog device", err)
+		return fmt.Errorf("Unable to feed watchdog %w", err)
 	}
 	return nil
 }
 
-func (w WatchDog) Feed() error {
-	return w.write("1")
-}
-
-func (w WatchDog) Stop() error {
-	var err error
-	err = w.write("V")
+func (w *WatchDog) Stop() error {
+	// Attempt a Magic Close to disarm the watchdog device
+	_, err := w.watchdogDevice.Write([]byte{'V'})
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to disarm watchdog %w", err)
 	}
-	err = w.file.Close()
+	err = w.watchdogDevice.Close()
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to close watchdog device %w", err)
 	}
 	return nil
 }

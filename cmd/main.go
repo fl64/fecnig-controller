@@ -36,20 +36,20 @@ func main() {
 	var config agent.Config
 	err := config.Load()
 	if err != nil {
-		logger.Fatal("Can't read env vars", zap.Error(err))
+		logger.Fatal("Unable to read env vars", zap.Error(err))
 	}
 
 	logger.Debug("Current config", zap.Reflect("config", config))
 
 	kubeClient, err := common.GetClientset(config.KubernetesAPITimeout)
 	if err != nil {
-		logger.Fatal("Can't create kubernetes clientSet", zap.Error(err))
+		logger.Fatal("Unable to create kubernetes clientSet", zap.Error(err))
 	}
 
 	wd := softdog.NewWatchdog(config.WatchdogDevice)
 	fencingAgent := agent.NewFencingAgent(logger, config, kubeClient, wd)
 	err = fencingAgent.Run(ctx)
 	if err != nil {
-		logger.Fatal("Can't run fencing-agent", zap.Error(err))
+		logger.Fatal("Unable run fencing-agent", zap.Error(err))
 	}
 }

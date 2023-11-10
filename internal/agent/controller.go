@@ -55,13 +55,45 @@ func (fa *FencingAgent) removeNodeLabel(ctx context.Context) error {
 	return nil
 }
 
+func (fa *FencingAgent) startWatchdog(ctx context.Context) error {
+	var err error
+	fa.logger.Info("Arming watchdog ...")
+	err = fa.watchDog.Start()
+	if err != nil {
+		return err
+	}
+	fa.logger.Info("Setting node label ...", zap.String("node", fa.config.NodeName))
+	err = fa.setNodeLabel(ctx)
+	if err != nil {
+		// We must stop watchdog if we can't set nodelabel
+		fa.logger.Error("Unable to set node label, so disarming watchdog...")
+		_ = fa.watchDog.Stop()
+		return err
+	}
+	return nil
+}
+
+func (fa *FencingAgent) stopWatchdog(ctx context.Context) error {
+	var err error
+	err = fa.removeNodeLabel(ctx)
+	if err != nil {
+		return err
+	}
+	err = fa.watchDog.Stop()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (fa *FencingAgent) Run(ctx context.Context) error {
 	ticker := time.NewTicker(fa.config.KubernetesAPICheckInterval)
 	var APIIsAvailable bool
 	var MaintenanceMode bool
 	var err error
-	err = fa.watchDog.Start()
+	err = fa.startWatchdog(ctx)
 	if err != nil {
+		fa.logger.Error("Unable to arm watchdog and set node labels", zap.Error(err))
 		return err
 	}
 	for {
@@ -69,28 +101,29 @@ func (fa *FencingAgent) Run(ctx context.Context) error {
 		case <-ticker.C:
 			node, err := fa.kubeClient.CoreV1().Nodes().Get(context.TODO(), fa.config.NodeName, v1.GetOptions{})
 			if err != nil {
-				fa.logger.Error("Can't reach API", zap.Error(err))
+				fa.logger.Error("Unable to reach API", zap.Error(err))
 				APIIsAvailable = false
 			} else {
 				fa.logger.Debug("API is available")
 				APIIsAvailable = true
 			}
 
+			// disable watchdog if node in
 			_, disruptionApprovedAnnotationExists := node.Annotations[common.DisruptionApprovedAnnotation]
 			_, approvedAnnotationExists := node.Annotations[common.ApprovedAnnotation]
 			if disruptionApprovedAnnotationExists || approvedAnnotationExists {
 				fa.logger.Warn("Node is in maintenance mode")
 				MaintenanceMode = true
-				err = fa.watchDog.Stop()
+				err = fa.stopWatchdog(ctx)
 				if err != nil {
-					fa.logger.Error("Can't stop watchdog", zap.Error(err))
+					fa.logger.Error("Unable to disarm watchdog", zap.Error(err))
 				}
 				continue
 			} else {
 				if MaintenanceMode {
-					err = fa.watchDog.Start()
+					err = fa.startWatchdog(ctx)
 					if err != nil {
-						fa.logger.Error("Can't start watchdog", zap.Error(err))
+						fa.logger.Error("Unable to arm watchdog", zap.Error(err))
 						continue
 					}
 				}
@@ -100,15 +133,15 @@ func (fa *FencingAgent) Run(ctx context.Context) error {
 			if APIIsAvailable {
 				err = fa.watchDog.Feed()
 				if err != nil {
-					fa.logger.Error("Can't feed watchdog", zap.Error(err))
+					fa.logger.Error("Unable to feed watchdog", zap.Error(err))
 				}
 			}
 
 		case <-ctx.Done():
 			fa.logger.Debug("Finishing the API check")
-			err = fa.watchDog.Stop()
+			err = fa.stopWatchdog(context.TODO())
 			if err != nil {
-				fa.logger.Error("Can't stop watchdog", zap.Error(err))
+				fa.logger.Error("Unable to disarm watchdog", zap.Error(err))
 			}
 			return err
 		}
