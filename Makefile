@@ -1,4 +1,4 @@
-TAG=v0.0.0-dev0
+TAG=v0.0.1-dev0
 
 .PHONY: build deploy undeploy enable-watchdog
 build:
