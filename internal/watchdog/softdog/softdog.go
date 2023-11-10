@@ -38,6 +38,7 @@ func (w *WatchDog) Stop() error {
 	// Attempt a Magic Close to disarm the watchdog device
 	_, err := w.watchdogDevice.Write([]byte{'V'})
 	if err != nil {
+		// watchdog already was disarmed
 		if errors.Is(err, os.ErrClosed) {
 			return nil
 		} else {

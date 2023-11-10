@@ -128,6 +128,7 @@ func (fa *FencingAgent) Run(ctx context.Context) error {
 
 			if maintanenceAnnotationsExists {
 				fa.logger.Warn("Node is in maintenance mode")
+				// if we already in maintenance mode, so we don't need to disarm watchdog again
 				if !MaintenanceMode {
 					MaintenanceMode = true
 					err = fa.stopWatchdog(ctx)
@@ -135,8 +136,10 @@ func (fa *FencingAgent) Run(ctx context.Context) error {
 						fa.logger.Error("Unable to disarm watchdog", zap.Error(err))
 					}
 				}
+				// skip, we don't need to feed watchdog
 				continue
 			} else {
+				// if we not in maintenance mode, so we don't need to arm watchdog again
 				if MaintenanceMode {
 					err = fa.startWatchdog(ctx)
 					if err != nil {
