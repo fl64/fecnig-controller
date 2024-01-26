@@ -11,6 +11,7 @@ type Config struct {
 	WatchDogTimeout            time.Duration `env:"WATCHDOG_TIMEOUT" env-default:"60s"`
 	KubernetesAPICheckInterval time.Duration `env:"KUBERNETES_API_CHECK_INTERVAL" env-default:"5s"`
 	KubernetesAPITimeout       time.Duration `env:"KUBERNETES_API_TIMEOUT" env-default:"5s"`
+	LivenessProbePort          string        `env:"LIVENESS_PROBE_PORT"  env-default:":8081"`
 	NodeName                   string        `env:"NODE_NAME"`
 }
 

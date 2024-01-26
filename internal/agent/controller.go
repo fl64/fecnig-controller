@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"net/http"
 	"time"
 )
 
@@ -79,6 +80,14 @@ func (fa *FencingAgent) startWatchdog(ctx context.Context) error {
 	return nil
 }
 
+func (fa *FencingAgent) startLiveness() {
+	fa.logger.Info("Start liveness server")
+	http.HandleFunc("/liveness", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = http.ListenAndServe(fa.config.LivenessProbePort, nil)
+}
+
 func (fa *FencingAgent) stopWatchdog(ctx context.Context) error {
 	var err error
 	fa.logger.Info("Remove node label", zap.String("node", fa.config.NodeName))
@@ -99,6 +108,7 @@ func (fa *FencingAgent) Run(ctx context.Context) error {
 	var APIIsAvailable bool
 	var MaintenanceMode bool
 	var err error
+	go fa.startLiveness()
 	err = fa.startWatchdog(ctx)
 	if err != nil {
 		fa.logger.Error("Unable to arm watchdog and set node labels", zap.Error(err))
