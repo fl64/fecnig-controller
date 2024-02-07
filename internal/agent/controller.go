@@ -85,7 +85,7 @@ func (fa *FencingAgent) startLiveness() {
 	http.HandleFunc("/liveness", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	_ = http.ListenAndServe(fa.config.LivenessProbePort, nil)
+	_ = http.ListenAndServe(fa.config.HealthProbeBindAddress, nil)
 }
 
 func (fa *FencingAgent) stopWatchdog(ctx context.Context) error {
