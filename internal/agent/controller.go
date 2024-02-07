@@ -81,8 +81,8 @@ func (fa *FencingAgent) startWatchdog(ctx context.Context) error {
 }
 
 func (fa *FencingAgent) startLiveness() {
-	fa.logger.Info("Start liveness server")
-	http.HandleFunc("/liveness", func(w http.ResponseWriter, r *http.Request) {
+	fa.logger.Info("Start healthz server")
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	_ = http.ListenAndServe(fa.config.HealthProbeBindAddress, nil)
