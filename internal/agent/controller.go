@@ -28,8 +28,9 @@ type FencingAgent struct {
 }
 
 func NewFencingAgent(logger *zap.Logger, config Config, kubeClient *kubernetes.Clientset, wd watchdog.WatchDog) *FencingAgent {
+	l := logger.With(zap.String("node", config.NodeName))
 	return &FencingAgent{
-		logger:     logger,
+		logger:     l,
 		config:     config,
 		kubeClient: kubeClient,
 		watchDog:   wd,
@@ -153,8 +154,7 @@ func (fa *FencingAgent) Run(ctx context.Context) error {
 				if MaintenanceMode {
 					err = fa.startWatchdog(ctx)
 					if err != nil {
-						fa.logger.Error("Unable to arm watchdog", zap.Error(err))
-						continue
+						fa.logger.Fatal("Unable to arm watchdog", zap.Error(err))
 					}
 				}
 				MaintenanceMode = false
